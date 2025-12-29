@@ -9,7 +9,7 @@ Sub CleanupDownloadsFolder()
         MsgBox "ダウンロードフォルダが見つかりませんでした。処理を終了します。"
         Exit Sub
     End If
-
+    
     Dim factory As New ActionFactory
     Dim dto As FileDTO
     Dim fileObj As Object
@@ -20,19 +20,20 @@ Sub CleanupDownloadsFolder()
     ' メインループ
     For Each fileObj In fso.GetFolder(dlPath).Files
         Set dto = New FileDTO
-        dto.FileName = fileObj.Name
-        dto.FilePath = fileObj.Path
-        dto.Extension = fso.GetExtensionName(fileObj.Path)
-        dto.FileType = fileObj.Type
-        dto.LastModified = fileObj.DateLastModified
-        dto.DestDesktopPath = dsPath
         
-        Dim action As IFileAction: Set action = factory.GetAction(dto)
-        action.Execute dto
+        ' 変更点: データを個別にセットせず、オブジェクトごと渡してLoadさせる
+        dto.Load fileObj, dsPath
         
-        ' 集計
-        Dim actName As String: actName = TypeName(action)
-        results(actName) = results(actName) + 1
+        ' 変更点: バリデーション結果を確認 (無効なファイルならスキップ)
+        If dto.IsValid Then
+            Dim action As IFileAction: Set action = factory.GetAction(dto)
+            action.Execute dto
+            
+            ' 集計
+            Dim actName As String: actName = TypeName(action)
+            results(actName) = results(actName) + 1
+        End If
+        
     Next fileObj
     
     ' 完了報告
@@ -61,8 +62,14 @@ End Function
 Private Sub ShowSummary(dict As Object)
     Dim msg As String, k As Variant
     msg = "清掃が完了しました！移動結果：" & vbCrLf
-    For Each k In dict.Keys
-        msg = msg & "・" & k & ": " & dict(k) & " 件" & vbCrLf
-    Next
+    
+    If dict.Count = 0 Then
+        msg = msg & "移動対象のファイルはありませんでした。"
+    Else
+        For Each k In dict.Keys
+            msg = msg & "・" & k & ": " & dict(k) & " 件" & vbCrLf
+        Next
+    End If
+    
     MsgBox msg, vbInformation, "終了"
 End Sub
